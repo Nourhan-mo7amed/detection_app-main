@@ -81,12 +81,17 @@ class _CameraPageState extends State<CameraPage> {
     });
 
     try {
+      // 1) تصوير الصورة من الكاميرا
       final file = await _controller!.takePicture();
       final bytes = await file.readAsBytes();
 
+      // 2) تحويلها لصورة UI عشان نعرضها ونرسم عليها
       final uiImage = await decodeImageFromList(bytes);
+
+      // 3) تشغيل البايبلاين (carton + crop + defect + QR + status)
       final result = await _pipeline.run(bytes);
 
+      // 4) لو مفيش كرتونة detected خالص
       if (result == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -99,35 +104,64 @@ class _CameraPageState extends State<CameraPage> {
             ),
           );
         }
-        setState(() {
+        if (mounted) {
+          setState(() {
+            _processing = false;
+          });
+        } else {
           _processing = false;
-        });
+        }
         return;
       }
 
-      // API call لو فيه QR
+      // 5) لو فيه QR → نبعت للـ API
       if (result.qr != null && result.qr!.isNotEmpty) {
         await _apiClient.sendSingleProduct(
           productId: result.qr!,
           maxDefects: result.defects.length,
           finalStatus: result.status,
         );
+      } else {
+        // مفيش QR → نعمل annotation بس، ومنبعتش للـ API
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No QR code found. Result will NOT be sent to server.',
+              ),
+              backgroundColor: Colors.blueGrey,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
 
+      // 6) حفظ الصورة والنتيجة عشان نعرضها بالرسم
+      if (!mounted) return;
       setState(() {
         _image = uiImage;
         _result = result;
       });
     } catch (e) {
+      // أي خطأ في التصوير / البايبلاين / API
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error capturing or processing image: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     } finally {
-      setState(() {
+      // 7) نرجّع حالة الـ processing لطبيعتها
+      if (mounted) {
+        setState(() {
+          _processing = false;
+        });
+      } else {
         _processing = false;
-      });
+      }
     }
   }
 
@@ -155,7 +189,7 @@ class _CameraPageState extends State<CameraPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Single Image QC'),
+        title: const Text('حسبي الله'),
         actions: [
           if (showResult)
             IconButton(icon: const Icon(Icons.refresh), onPressed: _reset),
