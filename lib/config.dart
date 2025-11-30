@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 class AppConfig {
   // thresholds
   static const double cartonConf = 0.5;
-  static const double defectConf = 0.25;
+  static const double defectConf = 0.40;
 
   // expand box ratio قبل الكروب للديفكت
   static const double expandRatio = 0.05;

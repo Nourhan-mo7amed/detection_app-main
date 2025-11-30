@@ -123,6 +123,49 @@ class DefectDetector {
       );
     }
 
-    return detections;
+    // Apply NMS
+    return _nms(detections, 0.45);
+  }
+
+  List<Detection> _nms(List<Detection> detections, double iouThreshold) {
+    if (detections.isEmpty) return [];
+
+    // Sort by score descending
+    detections.sort((a, b) => b.score.compareTo(a.score));
+
+    final List<Detection> result = [];
+    final List<bool> suppressed = List.filled(detections.length, false);
+
+    for (int i = 0; i < detections.length; i++) {
+      if (suppressed[i]) continue;
+
+      final current = detections[i];
+      result.add(current);
+
+      for (int j = i + 1; j < detections.length; j++) {
+        if (suppressed[j]) continue;
+
+        final other = detections[j];
+        if (_iou(current, other) > iouThreshold) {
+          suppressed[j] = true;
+        }
+      }
+    }
+    return result;
+  }
+
+  double _iou(Detection a, Detection b) {
+    final x1 = a.x1 > b.x1 ? a.x1 : b.x1;
+    final y1 = a.y1 > b.y1 ? a.y1 : b.y1;
+    final x2 = a.x2 < b.x2 ? a.x2 : b.x2;
+    final y2 = a.y2 < b.y2 ? a.y2 : b.y2;
+
+    if (x2 <= x1 || y2 <= y1) return 0.0;
+
+    final intersection = (x2 - x1) * (y2 - y1);
+    final areaA = (a.x2 - a.x1) * (a.y2 - a.y1);
+    final areaB = (b.x2 - b.x1) * (b.y2 - b.y1);
+
+    return intersection / (areaA + areaB - intersection);
   }
 }
